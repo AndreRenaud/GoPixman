@@ -38,7 +38,7 @@ func main() {
 	}
 	// Get the format of the Pixman image
 	format := pixman.ImageGetFormat(pixmanImage)
-	log.Printf("Pixman image format: %x", format)
+	log.Printf("Pixman image format: %s", format)
 	pixSize := pixmanImage.Bounds()
 	log.Printf("Pixman image size: %dx%d", pixSize.Dx(), pixSize.Dy())
 }

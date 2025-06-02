@@ -1,5 +1,7 @@
 package pixman
 
+import "fmt"
+
 type PixmanFormatCode uint32
 
 // Pixman format codes (partial list, add more as needed)
@@ -32,4 +34,27 @@ type PixmanColor struct {
 	Green uint16
 	Blue  uint16
 	Alpha uint16
+}
+
+func (f PixmanFormatCode) String() string {
+	switch f {
+	case PIXMAN_a8r8g8b8:
+		return "PIXMAN_a8r8g8b8"
+	case PIXMAN_x8r8g8b8:
+		return "PIXMAN_x8r8g8b8"
+	case PIXMAN_a8b8g8r8:
+		return "PIXMAN_a8b8g8r8"
+	case PIXMAN_x8b8g8r8:
+		return "PIXMAN_x8b8g8r8"
+	case PIXMAN_b8g8r8a8:
+		return "PIXMAN_b8g8r8a8"
+	case PIXMAN_b8g8r8x8:
+		return "PIXMAN_b8g8r8x8"
+	case PIXMAN_r5g6b5:
+		return "PIXMAN_r5g6b5"
+	case PIXMAN_b5g6r5:
+		return "PIXMAN_b5g6r5"
+	default:
+		return fmt.Sprintf("Unknown PixmanFormatCode: %x", uint32(f))
+	}
 }

@@ -3,6 +3,9 @@ package pixman
 import (
 	"fmt"
 	"image"
+	"log"
+	"os"
+	"runtime"
 	"unsafe"
 
 	"github.com/ebitengine/purego"
@@ -25,9 +28,31 @@ var (
 type Image struct {
 }
 
+func findSystemLibrary() string {
+	var dirs []string
+	libraryName := "libpixman-1.so.0"
+	switch runtime.GOOS {
+	case "darwin":
+		dirs = append(dirs, "/opt/homebrew/lib/", "/usr/local/lib", "/usr/lib")
+		libraryName = "libpixman-1.dylib"
+	case "linux":
+		dirs = append(dirs, "/usr/lib", "/usr/lib/x86_64-linux-gnu", "/usr/local/lib") // TODO: Parse /etc/ld.so.conf
+	default:
+		panic(fmt.Errorf("GOOS=%s is not supported", runtime.GOOS))
+	}
+
+	for _, dir := range dirs {
+		filename := dir + "/" + libraryName
+		if _, err := os.Stat(filename); err == nil {
+			return filename
+		}
+	}
+	panic(fmt.Sprintf("%s not found in %v", libraryName, dirs))
+}
+
 func init() {
 	var err error
-	pixmanLib, err = purego.Dlopen("/opt/homebrew/lib/libpixman-1.dylib", purego.RTLD_LAZY)
+	pixmanLib, err = purego.Dlopen(findSystemLibrary(), purego.RTLD_LAZY)
 	if err != nil {
 		panic("failed to load libpixman-1: " + err.Error())
 	}
@@ -49,8 +74,11 @@ func ImageFromImage(img image.Image) (*Image, error) {
 	var bits *uint32
 	switch t := img.(type) {
 	case *image.RGBA:
-	case *image.NRGBA:
 		format = PIXMAN_a8r8g8b8
+		stride = int32(t.Stride)
+		bits = (*uint32)(unsafe.Pointer(&t.Pix[0]))
+	case *image.NRGBA:
+		format = PIXMAN_x8r8g8b8
 		stride = int32(t.Stride)
 		bits = (*uint32)(unsafe.Pointer(&t.Pix[0]))
 	default:
@@ -58,6 +86,7 @@ func ImageFromImage(img image.Image) (*Image, error) {
 	}
 	width := int32(bounds.Dx())
 	height := int32(bounds.Dy())
+	log.Printf("Creating Pixman image from Go image: format=%s, width=%d, height=%d, stride=%d", format, width, height, stride)
 	pixImg := ImageCreateBits(format, width, height, bits, stride)
 	if pixImg == nil {
 		return nil, fmt.Errorf("failed to create Pixman image")
