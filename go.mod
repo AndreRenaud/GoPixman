@@ -1,4 +1,4 @@
-module github.com/AndreRenaud/go-pixman
+module github.com/AndreRenaud/GoPixman
 
 go 1.24.3
 

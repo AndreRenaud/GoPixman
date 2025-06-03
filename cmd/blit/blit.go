@@ -9,7 +9,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/AndreRenaud/go-pixman"
+	"github.com/AndreRenaud/GoPixman"
 )
 
 func loadFile(filename string) (image.Image, error) {
