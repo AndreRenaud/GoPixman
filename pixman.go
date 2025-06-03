@@ -46,6 +46,9 @@ func findPixmanLibrary() string {
 		libraryName = "libpixman-1.dylib"
 	case "linux":
 		dirs = append(dirs, "/usr/lib", "/usr/lib/x86_64-linux-gnu", "/usr/local/lib") // TODO: Parse /etc/ld.so.conf
+	case "windows":
+		dirs = append(dirs, "C:\\Windows\\System32", "C:\\MinGW64\\bin")
+		libraryName = "libpixman-1-0.dll"
 	default:
 		panic(fmt.Errorf("GOOS=%s is not supported", runtime.GOOS))
 	}
