@@ -3,6 +3,7 @@ package pixman
 import (
 	"fmt"
 	"image"
+	"image/color"
 	"log"
 	"os"
 	"runtime"
@@ -14,21 +15,29 @@ import (
 var (
 	pixmanLib uintptr
 
-	ImageCreateBits      func(format PixmanFormatCode, width int32, height int32, bits *uint32, rowstride int32) *Image
-	ImageCreateSolidFill func(color *PixmanColor) *Image
-	ImageGetFormat       func(image *Image) PixmanFormatCode
-	ImageGetWidth        func(image *Image) int32
-	ImageGetHeight       func(image *Image) int32
-	ImageGetStride       func(image *Image) int32
-	ImageGetDepth        func(image *Image) int32
-	ImageGetData         func(image *Image) *uint32
-	ImageComposite       func(op int32, src *Image, mask *Image, dest *Image, srcX int32, srcY int32, maskX int32, maskY int32, destX int32, destY int32, width int32, height int32) uint32
+	// These must match the C function signatures
+	ImageCreateBits      func(format PixmanFormatCode, width int, height int, bits *uint32, rowstride int) *PixmanImage
+	ImageCreateSolidFill func(color *PixmanColor) *PixmanImage
+	ImageGetFormat       func(image *PixmanImage) PixmanFormatCode
+	ImageGetWidth        func(image *PixmanImage) int32
+	ImageGetHeight       func(image *PixmanImage) int32
+	ImageGetStride       func(image *PixmanImage) int32
+	ImageGetDepth        func(image *PixmanImage) int32
+	ImageGetData         func(image *PixmanImage) *uint32
+	ImageComposite32     func(op PixmanOperation, src *PixmanImage, mask *PixmanImage, dest *PixmanImage, src_x, src_y, mask_x, mask_y, dest_x, dest_y int32, width, height int32) uint32
+	Fill                 func(bits *uint32, stride int, bpp int, x int, y int, width int, height int, xor uint32) int
+	//ImageComposite       func(op PixmanOperation, src *PixmanImage, mask *PixmanImage, dest *PixmanImage, src_x, src_y, mask_x, mask_y, dest_x, dest_y int16, width, height uint16) uint32
+	ImageUnref func(image *PixmanImage) int
 )
 
 type Image struct {
+	rawData []byte
+	pixman  *PixmanImage
 }
 
-func findSystemLibrary() string {
+type PixmanImage struct{}
+
+func findPixmanLibrary() string {
 	var dirs []string
 	libraryName := "libpixman-1.so.0"
 	switch runtime.GOOS {
@@ -52,7 +61,7 @@ func findSystemLibrary() string {
 
 func init() {
 	var err error
-	pixmanLib, err = purego.Dlopen(findSystemLibrary(), purego.RTLD_LAZY)
+	pixmanLib, err = purego.Dlopen(findPixmanLibrary(), purego.RTLD_LAZY)
 	if err != nil {
 		panic("failed to load libpixman-1: " + err.Error())
 	}
@@ -64,32 +73,79 @@ func init() {
 	purego.RegisterLibFunc(&ImageGetStride, pixmanLib, "pixman_image_get_stride")
 	purego.RegisterLibFunc(&ImageGetDepth, pixmanLib, "pixman_image_get_depth")
 	purego.RegisterLibFunc(&ImageGetData, pixmanLib, "pixman_image_get_data")
-	purego.RegisterLibFunc(&ImageComposite, pixmanLib, "pixman_image_composite")
+	//purego.RegisterLibFunc(&ImageComposite, pixmanLib, "pixman_image_composite")
+	purego.RegisterLibFunc(&ImageComposite32, pixmanLib, "pixman_image_composite32")
+	purego.RegisterLibFunc(&ImageUnref, pixmanLib, "pixman_image_unref")
+	purego.RegisterLibFunc(&Fill, pixmanLib, "pixman_fill")
 }
 
 func ImageFromImage(img image.Image) (*Image, error) {
+	// We don't do subimages yet
+	if img.Bounds().Min.X != 0 || img.Bounds().Min.Y != 0 {
+		return nil, fmt.Errorf("image bounds must start at (0,0), got %v", img.Bounds())
+	}
 	bounds := img.Bounds()
 	var format PixmanFormatCode
-	var stride int32
+	var stride int
 	var bits *uint32
 	switch t := img.(type) {
 	case *image.RGBA:
-		format = PIXMAN_a8r8g8b8
-		stride = int32(t.Stride)
+		format = PIXMAN_r8g8b8a8
+		stride = t.Stride
 		bits = (*uint32)(unsafe.Pointer(&t.Pix[0]))
 	case *image.NRGBA:
-		format = PIXMAN_x8r8g8b8
-		stride = int32(t.Stride)
+		format = PIXMAN_r8g8b8a8
+		stride = t.Stride
 		bits = (*uint32)(unsafe.Pointer(&t.Pix[0]))
 	default:
 		return nil, fmt.Errorf("unsupported image format %T", img)
 	}
-	width := int32(bounds.Dx())
-	height := int32(bounds.Dy())
+	width := bounds.Dx()
+	height := bounds.Dy()
+	if width <= 0 || height <= 0 {
+		return nil, fmt.Errorf("invalid image dimensions: width=%d, height=%d", width, height)
+	}
+	// todo: stop making a copy, and somehow make sure the Go gc doesn't clean up the bits pointer?
+	bitsCopy := make([]uint8, height*stride)
+	copy(bitsCopy, unsafe.Slice((*uint8)(unsafe.Pointer(bits)), len(bitsCopy)))
+	//bits8 := unsafe.Slice((*byte)(unsafe.Pointer(&bitsCopy[0])), len(bitsCopy)*4)
+	//for i := range bitsCopy {
+	//if i%100 == 0 {
+	//log.Printf("Converting pixel %d: %08x %#v", i, bitsCopy[i], bits8[i*4:i*4+4])
+	//}
+	//}
 	log.Printf("Creating Pixman image from Go image: format=%s, width=%d, height=%d, stride=%d", format, width, height, stride)
-	pixImg := ImageCreateBits(format, width, height, bits, stride)
-	if pixImg == nil {
+	retval := &Image{
+		rawData: bitsCopy,
+	}
+	retval.pixman = ImageCreateBits(format, width, height, (*uint32)(unsafe.Pointer(&bitsCopy[0])), stride)
+	log.Printf("Pixman image created: %p", retval.pixman)
+
+	if retval.pixman == nil {
 		return nil, fmt.Errorf("failed to create Pixman image")
 	}
-	return pixImg, nil
+	runtime.AddCleanup(retval, func(raw *PixmanImage) {
+		ImageUnref(raw)
+	}, retval.pixman)
+	return retval, nil
+}
+
+func ImageSolid(col color.Color) (*Image, error) {
+	r, g, b, a := col.RGBA()
+	pixCol := &PixmanColor{
+		Red:   uint16(r),
+		Green: uint16(g),
+		Blue:  uint16(b),
+		Alpha: uint16(a),
+	}
+	retval := &Image{}
+	retval.pixman = ImageCreateSolidFill(pixCol)
+	if retval.pixman == nil {
+		return nil, fmt.Errorf("failed to create Pixman solid fill image")
+	}
+	runtime.AddCleanup(retval, func(raw *PixmanImage) {
+		ImageUnref(raw)
+	}, retval.pixman)
+	log.Printf("solid %#v stride: %d", col, ImageGetStride(retval.pixman))
+	return retval, nil
 }

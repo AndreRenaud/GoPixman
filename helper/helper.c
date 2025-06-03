@@ -23,7 +23,10 @@ struct pixman_formats {
     FORMAT(PIXMAN_a4r4g4b4), \
     FORMAT(PIXMAN_x4r4g4b4), \
     FORMAT(PIXMAN_a4b4g4r4), \
-    FORMAT(PIXMAN_x4b4g4r4)
+    FORMAT(PIXMAN_x4b4g4r4), \
+    FORMAT(PIXMAN_r8g8b8a8), \
+    FORMAT(PIXMAN_r8g8b8x8)
+
 
 int main(void)
 {
