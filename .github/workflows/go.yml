@@ -23,6 +23,8 @@ jobs:
       run: go vet ./...
     - name: Benchmarks
       run: go test -bench=. -benchtime=5s -run=^$
+    - name: Build blit
+      run: go build -o blit ./cmd/blit
     - name: golangci-lint
       uses: golangci/golangci-lint-action@v8
       with:
