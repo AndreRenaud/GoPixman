@@ -24,7 +24,7 @@ var (
 	ImageGetStride       func(image *PixmanImage) int32
 	ImageGetDepth        func(image *PixmanImage) int32
 	ImageGetData         func(image *PixmanImage) *uint32
-	ImageComposite32     func(op PixmanOperation, src *PixmanImage, mask *PixmanImage, dest *PixmanImage, src_x, src_y, mask_x, mask_y, dest_x, dest_y int32, width, height int32) uint32
+	ImageComposite32     func(op PixmanOperation, src *PixmanImage, mask *PixmanImage, dest *PixmanImage, src_x, src_y, mask_x, mask_y, dest_x, dest_y int32, width, height int32)
 	Fill                 func(bits *uint32, stride int, bpp int, x int, y int, width int, height int, xor uint32) int
 	//ImageComposite       func(op PixmanOperation, src *PixmanImage, mask *PixmanImage, dest *PixmanImage, src_x, src_y, mask_x, mask_y, dest_x, dest_y int16, width, height uint16) uint32
 	ImageUnref func(image *PixmanImage) int
@@ -65,6 +65,7 @@ func init() {
 	if err != nil {
 		panic("failed to load libpixman-1: " + err.Error())
 	}
+
 	purego.RegisterLibFunc(&ImageCreateBits, pixmanLib, "pixman_image_create_bits")
 	purego.RegisterLibFunc(&ImageCreateSolidFill, pixmanLib, "pixman_image_create_solid_fill")
 	purego.RegisterLibFunc(&ImageGetFormat, pixmanLib, "pixman_image_get_format")
@@ -119,7 +120,7 @@ func ImageFromImage(img image.Image) (*Image, error) {
 		rawData: bitsCopy,
 	}
 	retval.pixman = ImageCreateBits(format, width, height, (*uint32)(unsafe.Pointer(&bitsCopy[0])), stride)
-	log.Printf("Pixman image created: %p", retval.pixman)
+	log.Printf("Pixman image created: %p %#v", retval.pixman, retval.Bounds())
 
 	if retval.pixman == nil {
 		return nil, fmt.Errorf("failed to create Pixman image")
@@ -146,6 +147,5 @@ func ImageSolid(col color.Color) (*Image, error) {
 	runtime.AddCleanup(retval, func(raw *PixmanImage) {
 		ImageUnref(raw)
 	}, retval.pixman)
-	log.Printf("solid %#v stride: %d", col, ImageGetStride(retval.pixman))
 	return retval, nil
 }

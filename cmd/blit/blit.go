@@ -52,8 +52,8 @@ func main() {
 	pixSize := pixmanImage.Bounds()
 	log.Printf("Pixman image size: %dx%d@%d", pixSize.Dx(), pixSize.Dy(), pixmanImage.Depth())
 
-	solid, err := pixman.ImageSolid(color.RGBA{R: 255, G: 0, B: 255, A: 255})
-	//solid, err := pixman.ImageFromImage(img)
+	//solid, err := pixman.ImageSolid(color.RGBA{R: 255, G: 0, B: 0, A: 255})
+	solid, err := pixman.ImageFromImage(img)
 	//solid, err := pixman.ImageFromImage(image.NewUniform(color.RGBA{255, 0, 0, 255}))
 	//draw.Draw(pixmanImage, image.Rect(0, 0, 20, 20), image.NewUniform(color.RGBA{255, 0, 0, 255}), image.Point{}, draw.Src)
 	if err != nil {
@@ -62,9 +62,10 @@ func main() {
 
 	// Draw using Go's image/draw package
 	draw.Draw(pixmanImage, image.Rect(0, 0, 20, 20), image.NewUniform(color.RGBA{255, 255, 0, 255}), image.Point{}, draw.Src)
-	// Draw using Pixman
+	// Fill a colour using pixman
 	pixmanImage.Fill(image.Rect(10, 40, 5, 30), color.RGBA{128, 0, 128, 255})
-	pixmanImage.Composite(solid, image.Rect(10, 10, 30, 30), image.Pt(30, 30))
+	// Composite the images together using pixman
+	pixmanImage.Composite(solid, image.Rect(10, 10, 300, 300), image.Pt(30, 30))
 
 	if *outputFile != "" {
 		savePNG(pixmanImage, *outputFile)
