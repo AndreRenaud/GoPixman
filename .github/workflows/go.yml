@@ -45,7 +45,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: install dependencies
-      run: choco install pixman
+      run: pacman install -S mingw-w64-x86_64-pixman
     - name: Setup Go 1.24.3
       uses: actions/setup-go@v5
       with:
