@@ -17,9 +17,12 @@ func loadFile(filename string) (image.Image, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer data.Close()
 	img, err := png.Decode(data)
 	if err != nil {
+		_ = data.Close()
+		return nil, err
+	}
+	if err := data.Close(); err != nil {
 		return nil, err
 	}
 	return img, nil
