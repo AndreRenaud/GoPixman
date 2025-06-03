@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"image"
 	"image/color"
-	"log"
 	"os"
 	"runtime"
 	"unsafe"
@@ -46,6 +45,9 @@ func findPixmanLibrary() string {
 		libraryName = "libpixman-1.dylib"
 	case "linux":
 		dirs = append(dirs, "/usr/lib", "/usr/lib/x86_64-linux-gnu", "/usr/local/lib") // TODO: Parse /etc/ld.so.conf
+	case "windows":
+		dirs = append(dirs, "C:\\Windows\\System32", "C:\\MinGW64\\bin")
+		libraryName = "libpixman-1-0.dll"
 	default:
 		panic(fmt.Errorf("GOOS=%s is not supported", runtime.GOOS))
 	}
@@ -115,12 +117,12 @@ func ImageFromImage(img image.Image) (*Image, error) {
 	//log.Printf("Converting pixel %d: %08x %#v", i, bitsCopy[i], bits8[i*4:i*4+4])
 	//}
 	//}
-	log.Printf("Creating Pixman image from Go image: format=%s, width=%d, height=%d, stride=%d", format, width, height, stride)
+	//log.Printf("Creating Pixman image from Go image: format=%s, width=%d, height=%d, stride=%d", format, width, height, stride)
 	retval := &Image{
 		rawData: bitsCopy,
 	}
 	retval.pixman = ImageCreateBits(format, width, height, (*uint32)(unsafe.Pointer(&bitsCopy[0])), stride)
-	log.Printf("Pixman image created: %p %#v", retval.pixman, retval.Bounds())
+	//log.Printf("Pixman image created: %p %#v", retval.pixman, retval.Bounds())
 
 	if retval.pixman == nil {
 		return nil, fmt.Errorf("failed to create Pixman image")
