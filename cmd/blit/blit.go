@@ -30,8 +30,14 @@ func savePNG(img image.Image, filename string) error {
 	if err != nil {
 		return err
 	}
-	defer outFile.Close()
-	return png.Encode(outFile, img)
+	if err := png.Encode(outFile, img); err != nil {
+		_ = outFile.Close()
+		return err
+	}
+	if err := outFile.Close(); err != nil {
+		return err
+	}
+	return nil
 }
 
 func main() {
@@ -68,7 +74,9 @@ func main() {
 	pixmanImage.Composite(solid, image.Rect(10, 10, 300, 300), image.Pt(30, 30))
 
 	if *outputFile != "" {
-		savePNG(pixmanImage, *outputFile)
+		if err := savePNG(pixmanImage, *outputFile); err != nil {
+			log.Fatalf("failed to save image: %v", err)
+		}
 		log.Printf("Saved %dx%d image to %q", pixSize.Dx(), pixSize.Dy(), *outputFile)
 	}
 
