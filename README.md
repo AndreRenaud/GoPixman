@@ -1,6 +1,8 @@
 # GoPixman
 
 [![Go Ci](https://github.com/AndreRenaud/GoPixman/actions/workflows/go.yml/badge.svg)](https://github.com/AndreRenaud/GoPixman/actions/workflows/go.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/AndreRenaud/GoPixman)](https://goreportcard.com/report/github.com/AndreRenaud/GoPixman)
+[![PkgGoDev](https://pkg.go.dev/badge/github.com/AndreRenaud/GoPixman)](https://pkg.go.dev/github.com/AndreRenaud/GoPixman)
 
 
 GoPixman is a purego wrapper for Pixman to provide highly optimised software blitting functionality, especially on embedded platforms.
