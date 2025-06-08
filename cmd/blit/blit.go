@@ -9,7 +9,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/AndreRenaud/GoPixman"
+	pixman "github.com/AndreRenaud/GoPixman"
 )
 
 func loadFile(filename string) (image.Image, error) {
@@ -61,17 +61,14 @@ func main() {
 	pixSize := pixmanImage.Bounds()
 	log.Printf("Pixman image size: %dx%d@%d", pixSize.Dx(), pixSize.Dy(), pixmanImage.Depth())
 
-	//solid, err := pixman.ImageSolid(color.RGBA{R: 255, G: 0, B: 0, A: 255})
-	solid, err := pixman.ImageFromImage(img)
-	//solid, err := pixman.ImageFromImage(image.NewUniform(color.RGBA{255, 0, 0, 255}))
-	//draw.Draw(pixmanImage, image.Rect(0, 0, 20, 20), image.NewUniform(color.RGBA{255, 0, 0, 255}), image.Point{}, draw.Src)
+	solid, err := pixman.ImageSolid(color.RGBA{R: 255, G: 0, B: 0, A: 128})
 	if err != nil {
 		log.Fatalf("failed to create solid fill image: %s", err)
 	}
 
-	// Draw using Go's image/draw package
+	// Draw a yellow rectangle using Go's image/draw package
 	draw.Draw(pixmanImage, image.Rect(0, 0, 20, 20), image.NewUniform(color.RGBA{255, 255, 0, 255}), image.Point{}, draw.Src)
-	// Fill a colour using pixman
+	// Fill a translucent purple rectangle using pixman
 	pixmanImage.Fill(image.Rect(10, 40, 5, 30), color.RGBA{128, 0, 128, 255})
 	// Composite the images together using pixman
 	pixmanImage.Composite(solid, image.Rect(10, 10, 300, 300), image.Pt(30, 30))

@@ -25,8 +25,7 @@ var (
 	ImageGetData         func(image *PixmanImage) *uint32
 	ImageComposite32     func(op PixmanOperation, src *PixmanImage, mask *PixmanImage, dest *PixmanImage, src_x, src_y, mask_x, mask_y, dest_x, dest_y int32, width, height int32)
 	Fill                 func(bits *uint32, stride int, bpp int, x int, y int, width int, height int, xor uint32) int
-	//ImageComposite       func(op PixmanOperation, src *PixmanImage, mask *PixmanImage, dest *PixmanImage, src_x, src_y, mask_x, mask_y, dest_x, dest_y int16, width, height uint16) uint32
-	ImageUnref func(image *PixmanImage) int
+	ImageUnref           func(image *PixmanImage) int
 )
 
 type Image struct {
@@ -76,7 +75,6 @@ func init() {
 	purego.RegisterLibFunc(&ImageGetStride, pixmanLib, "pixman_image_get_stride")
 	purego.RegisterLibFunc(&ImageGetDepth, pixmanLib, "pixman_image_get_depth")
 	purego.RegisterLibFunc(&ImageGetData, pixmanLib, "pixman_image_get_data")
-	//purego.RegisterLibFunc(&ImageComposite, pixmanLib, "pixman_image_composite")
 	purego.RegisterLibFunc(&ImageComposite32, pixmanLib, "pixman_image_composite32")
 	purego.RegisterLibFunc(&ImageUnref, pixmanLib, "pixman_image_unref")
 	purego.RegisterLibFunc(&Fill, pixmanLib, "pixman_fill")
@@ -108,21 +106,11 @@ func ImageFromImage(img image.Image) (*Image, error) {
 	if width <= 0 || height <= 0 {
 		return nil, fmt.Errorf("invalid image dimensions: width=%d, height=%d", width, height)
 	}
-	// todo: stop making a copy, and somehow make sure the Go gc doesn't clean up the bits pointer?
-	bitsCopy := make([]uint8, height*stride)
-	copy(bitsCopy, unsafe.Slice((*uint8)(unsafe.Pointer(bits)), len(bitsCopy)))
-	//bits8 := unsafe.Slice((*byte)(unsafe.Pointer(&bitsCopy[0])), len(bitsCopy)*4)
-	//for i := range bitsCopy {
-	//if i%100 == 0 {
-	//log.Printf("Converting pixel %d: %08x %#v", i, bitsCopy[i], bits8[i*4:i*4+4])
-	//}
-	//}
-	//log.Printf("Creating Pixman image from Go image: format=%s, width=%d, height=%d, stride=%d", format, width, height, stride)
+	bitSlice := unsafe.Slice((*uint8)(unsafe.Pointer(bits)), height*stride)
 	retval := &Image{
-		rawData: bitsCopy,
+		rawData: bitSlice,
 	}
-	retval.pixman = ImageCreateBits(format, width, height, (*uint32)(unsafe.Pointer(&bitsCopy[0])), stride)
-	//log.Printf("Pixman image created: %p %#v", retval.pixman, retval.Bounds())
+	retval.pixman = ImageCreateBits(format, width, height, bits, stride)
 
 	if retval.pixman == nil {
 		return nil, fmt.Errorf("failed to create Pixman image")

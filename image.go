@@ -15,6 +15,8 @@ func (i *Image) ColorModel() color.Model {
 	switch format {
 	case PIXMAN_a8r8g8b8, PIXMAN_x8r8g8b8, PIXMAN_a8b8g8r8, PIXMAN_x8b8g8r8:
 		return color.RGBAModel
+	case PIXMAN_b5g6r5, PIXMAN_r5g6b5:
+		return color.RGBAModel // 16-bit formats, treated as RGB
 	default:
 		// TODO: Handle other formats
 		return color.NRGBA64Model
@@ -77,12 +79,23 @@ func (i *Image) At(x, y int) color.Color {
 			B: rawData[offset+2],
 			A: 255,
 		}
+	case PIXMAN_b5g6r5:
+		col = color.RGBA{
+			R: (rawData[offset+1] & 0x1F) << 3,                            // Red bits
+			G: ((rawData[offset+1] >> 5) | (rawData[offset] & 0x03)) << 2, // Green bits
+			B: (rawData[offset] >> 2) & 0x1F << 3,                         // Blue bits
+			A: 255,                                                        // No alpha in this format
+		}
+	case PIXMAN_r5g6b5:
+		col = color.RGBA{
+			R: (rawData[offset] & 0xf8),
+			G: ((rawData[offset] & 0x7) << 5) | (rawData[offset+1]&0xe0)>>3,
+			B: (rawData[offset+1] & 0x1f) << 3,
+			A: 255, // No alpha in this format
+		}
 	default:
 		col = color.Transparent // Unsupported format
 	}
-	//if (y%20) == 0 && (x%20) == 0 {
-	//log.Printf("At(%d, %d) offset: %d/%d, stride: %d, depth: %d = %#v", x, y, offset, len(i.rawData), stride, depth, col)
-	//}
 	return col
 }
 
@@ -98,21 +111,29 @@ func (i *Image) Set(x, y int, c color.Color) {
 	offset := y*int(stride) + x*int(depth)/8
 	rawData := i.getRawData()
 
+	colR, colG, colB, colA := c.RGBA()
+	colR8 := uint8(colR >> 8)
+	colG8 := uint8(colG >> 8)
+	colB8 := uint8(colB >> 8)
+	colA8 := uint8(colA >> 8)
+
 	switch ImageGetFormat(i.pixman) {
 	case PIXMAN_r8g8b8a8:
-		if rgba, ok := c.(color.RGBA); ok {
-			rawData[offset] = rgba.R
-			rawData[offset+1] = rgba.G
-			rawData[offset+2] = rgba.B
-			rawData[offset+3] = rgba.A
-		}
+		rawData[offset] = colR8
+		rawData[offset+1] = colG8
+		rawData[offset+2] = colB8
+		rawData[offset+3] = colA8
 	case PIXMAN_r8g8b8x8:
-		if rgba, ok := c.(color.NRGBA); ok {
-			rawData[offset] = rgba.R
-			rawData[offset+1] = rgba.G
-			rawData[offset+2] = rgba.B
-			rawData[offset+3] = 255 // No alpha in this format
-		}
+		rawData[offset] = colR8
+		rawData[offset+1] = colG8
+		rawData[offset+2] = colB8
+		rawData[offset+3] = 255
+	case PIXMAN_b5g6r5:
+		rawData[offset] = colB8&0xf8 | colG8>>5
+		rawData[offset+1] = colG8&0x1c<<3 | colR8>>3
+	case PIXMAN_r5g6b5:
+		rawData[offset] = colR8&0xf8 | (colG8>>5)&0x07
+		rawData[offset+1] = colG8&0x1c<<3 | colB8>>3
 	default:
 		// Unsupported format, do nothing
 	}
@@ -120,9 +141,6 @@ func (i *Image) Set(x, y int, c color.Color) {
 
 // Composite performs a blit operation from the sub-image of `src` defined by `r`, placing the result at the point `sp` in this image.
 func (i *Image) Composite(src *Image, r image.Rectangle, sp image.Point) {
-	//log.Printf("Blitting %d,%d-%d,%d to %d,%d-%d,%d", r.Min.X, r.Min.Y, r.Min.X+r.Dx(), r.Min.Y+r.Dy(), sp.X, sp.Y, sp.X+r.Dx(), sp.Y+r.Dy())
-	//log.Printf("Src: %p %v, Dest: %p %v", src.pixman, src.Bounds(), i.pixman, i.Bounds())
-
 	ImageComposite32(PIXMAN_OP_OVER, src.pixman, nil, i.pixman,
 		int32(r.Min.X), int32(r.Min.Y), // src_x, src_y (source rectangle)
 		0, 0, // mask_x, mask_y (no mask)
