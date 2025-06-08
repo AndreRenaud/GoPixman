@@ -88,7 +88,7 @@ func (i *Image) At(x, y int) color.Color {
 	//A: 255,                                                        // No alpha in this format
 	//}
 	case PIXMAN_r5g6b5:
-		log.Printf("RGB565 at %d,%d: %02x %02x", x, y, rawData[offset], rawData[offset+1])
+		//log.Printf("RGB565 at %d,%d: %02x %02x", x, y, rawData[offset], rawData[offset+1])
 		rgba := color.RGBA{
 			R: (rawData[offset+1] & 0xf8),
 			G: ((rawData[offset+1] & 0x7) << 5) | (rawData[offset]&0xe0)>>3,
@@ -105,7 +105,7 @@ func (i *Image) At(x, y int) color.Color {
 			rgba.B |= 0x07
 		}
 		col = rgba
-		log.Printf("RGB565 color at %d,%d: %v", x, y, col)
+		//log.Printf("RGB565 color at %d,%d: %v", x, y, col)
 	default:
 		col = color.Transparent // Unsupported format
 	}

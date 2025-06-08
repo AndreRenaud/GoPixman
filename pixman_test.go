@@ -35,6 +35,36 @@ func compareSubImage(img1, img2 image.Image, bounds image.Rectangle, delta uint3
 	return nil
 }
 
+func buildRGB565(img image.Image) ([]byte, error) {
+	bounds := img.Bounds()
+	if bounds.Min.X != 0 || bounds.Min.Y != 0 {
+		return nil, fmt.Errorf("image bounds must start at (0,0), got %v", img.Bounds())
+	}
+	width := bounds.Dx()
+	height := bounds.Dy()
+	if width <= 0 || height <= 0 {
+		return nil, fmt.Errorf("invalid image dimensions: width=%d, height=%d", width, height)
+	}
+
+	data := make([]byte, width*height*2)
+	for y := range height {
+		for x := range width {
+			r, g, b, _ := img.At(x, y).RGBA()
+			// Pack them all into 16-bit RGB565 format
+			r5 := uint16(r >> 11)
+			g6 := uint16(g >> 10)
+			b5 := uint16(b >> 11)
+
+			rgb565 := (r5 << 11) | (g6 << 5) | b5
+
+			offset := (y*width + x) * 2
+			data[offset+1] = uint8(rgb565 >> 8)
+			data[offset+0] = uint8(rgb565 & 0xff)
+		}
+	}
+	return data, nil
+}
+
 func loadFile(filename string) (image.Image, error) {
 	data, err := os.Open(filename)
 	if err != nil {
@@ -49,18 +79,6 @@ func loadFile(filename string) (image.Image, error) {
 		return nil, fmt.Errorf("failed to close file %s: %v", filename, err)
 	}
 	return img, nil
-}
-
-func savePng(img image.Image, filename string) {
-	file, err := os.Create(filename)
-	if err != nil {
-		panic(fmt.Sprintf("failed to create PNG file %s: %v", filename, err))
-	}
-	defer file.Close()
-
-	if err := png.Encode(file, img); err != nil {
-		panic(fmt.Sprintf("failed to encode PNG file %s: %v", filename, err))
-	}
 }
 
 func BenchmarkImageFill(b *testing.B) {
@@ -151,15 +169,15 @@ func TestImageBlit(t *testing.T) {
 	}
 }
 
+// Load various images, manually build a RGB565 representation, and compare it to the original image.
 func TestRGB565(t *testing.T) {
-	bases := []string{"testdata/red", "testdata/blue", "testdata/green", "testdata/pg-coral"}
-	for _, base := range bases {
-		t.Logf("Testing RGB565 for base: %s", base)
-		img, err := loadFile(base + ".png")
+	images := []string{"testdata/red.png", "testdata/blue.png", "testdata/green.png", "testdata/pg-coral.png"}
+	for _, image := range images {
+		img, err := loadFile(image)
 		if err != nil {
 			t.Fatalf("failed to load image: %v", err)
 		}
-		rawData, err := os.ReadFile(base + "-rgb565.raw")
+		rawData, err := buildRGB565(img)
 		if err != nil {
 			t.Fatalf("failed to read raw data file: %v", err)
 		}
@@ -168,10 +186,10 @@ func TestRGB565(t *testing.T) {
 		if err != nil {
 			t.Fatalf("failed to create Pixman image from raw data: %v", err)
 		}
-		savePng(rawImage, base+"-rgb565.png")
 
-		if err := compareSubImage(rawImage, img, rawImage.Bounds(), 0x7f); err != nil {
-			t.Errorf("RGB565 image did not match expected image: %v", err)
+		// Make sure the top 5 bits are close enough
+		if err := compareSubImage(rawImage, img, rawImage.Bounds(), 0x07); err != nil {
+			t.Errorf("RGB565 image did not match for %s expected image: %v", image, err)
 		}
 	}
 }
