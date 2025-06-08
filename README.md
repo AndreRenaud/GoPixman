@@ -10,3 +10,9 @@ GoPixman is a purego wrapper for Pixman to provide highly optimised software bli
 Pixman is a library that provides low-level pixel manipulation features such as image compositing and trapezoid rasterization.
 
 Canonical Pixman source: https://gitlab.freedesktop.org/pixman/pixman
+
+## Helpers
+Use FFMPEG to create raw images for format testing, ie:
+```
+ffmpeg -i testdata/pg-coral.png -t 5 -r 1 -pix_fmt rgb565 frame-%d.raw
+```

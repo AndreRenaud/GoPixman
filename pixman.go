@@ -107,14 +107,42 @@ func ImageFromImage(img image.Image) (*Image, error) {
 		return nil, fmt.Errorf("invalid image dimensions: width=%d, height=%d", width, height)
 	}
 	bitSlice := unsafe.Slice((*uint8)(unsafe.Pointer(bits)), height*stride)
-	retval := &Image{
-		rawData: bitSlice,
-	}
-	retval.pixman = ImageCreateBits(format, width, height, bits, stride)
+	return ImageFromBits(format, width, height, bitSlice, stride)
+	/*
+		retval := &Image{
+			rawData: bitSlice,
+		}
+		retval.pixman = ImageCreateBits(format, width, height, bits, stride)
 
-	if retval.pixman == nil {
-		return nil, fmt.Errorf("failed to create Pixman image")
+		if retval.pixman == nil {
+			return nil, fmt.Errorf("failed to create Pixman image")
+		}
+		runtime.AddCleanup(retval, func(raw *PixmanImage) {
+			ImageUnref(raw)
+		}, retval.pixman)
+		return retval, nil
+	*/
+}
+
+func ImageFromBits(format PixmanFormatCode, width, height int, bits []byte, stride int) (*Image, error) {
+	if len(bits) == 0 || width <= 0 || height <= 0 {
+		return nil, fmt.Errorf("invalid parameters: bits length=%d, width=%d, height=%d", len(bits), width, height)
 	}
+	if format.BPP() <= 0 {
+		return nil, fmt.Errorf("invalid format %s with BPP %d", format, format.BPP())
+	}
+	if stride != format.BPP()/8*width {
+		return nil, fmt.Errorf("stride %d does not match format %s(bpp=%d) width %d", stride, format, format.BPP(), width)
+	}
+	if len(bits) < stride*height {
+		return nil, fmt.Errorf("bits length %d is less than required %d for width %d and height %d", len(bits), stride*height, width, height)
+	}
+	retval := &Image{}
+	retval.pixman = ImageCreateBits(format, width, height, (*uint32)(unsafe.Pointer(&bits[0])), stride)
+	if retval.pixman == nil {
+		return nil, fmt.Errorf("failed to create Pixman image from bits")
+	}
+	retval.rawData = unsafe.Slice((*uint8)(unsafe.Pointer(&bits[0])), stride*height)
 	runtime.AddCleanup(retval, func(raw *PixmanImage) {
 		ImageUnref(raw)
 	}, retval.pixman)

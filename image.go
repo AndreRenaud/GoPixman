@@ -4,6 +4,7 @@ import (
 	"image"
 	"image/color"
 	"image/draw"
+	"log"
 	"os"
 	"unsafe"
 )
@@ -79,20 +80,32 @@ func (i *Image) At(x, y int) color.Color {
 			B: rawData[offset+2],
 			A: 255,
 		}
-	case PIXMAN_b5g6r5:
-		col = color.RGBA{
-			R: (rawData[offset+1] & 0x1F) << 3,                            // Red bits
-			G: ((rawData[offset+1] >> 5) | (rawData[offset] & 0x03)) << 2, // Green bits
-			B: (rawData[offset] >> 2) & 0x1F << 3,                         // Blue bits
-			A: 255,                                                        // No alpha in this format
-		}
+	//case PIXMAN_b5g6r5:
+	//col = color.RGBA{
+	//R: (rawData[offset+1] & 0x1F) << 3,                            // Red bits
+	//G: ((rawData[offset+1] >> 5) | (rawData[offset] & 0x03)) << 2, // Green bits
+	//B: (rawData[offset] >> 2) & 0x1F << 3,                         // Blue bits
+	//A: 255,                                                        // No alpha in this format
+	//}
 	case PIXMAN_r5g6b5:
-		col = color.RGBA{
-			R: (rawData[offset] & 0xf8),
-			G: ((rawData[offset] & 0x7) << 5) | (rawData[offset+1]&0xe0)>>3,
-			B: (rawData[offset+1] & 0x1f) << 3,
+		log.Printf("RGB565 at %d,%d: %02x %02x", x, y, rawData[offset], rawData[offset+1])
+		rgba := color.RGBA{
+			R: (rawData[offset+1] & 0xf8),
+			G: ((rawData[offset+1] & 0x7) << 5) | (rawData[offset]&0xe0)>>3,
+			B: (rawData[offset] & 0x1f) << 3,
 			A: 255, // No alpha in this format
 		}
+		if rgba.R&0x08 != 0 {
+			rgba.R |= 0x07
+		}
+		if rgba.G&0x04 != 0 {
+			rgba.G |= 0x03
+		}
+		if rgba.B&0x08 != 0 {
+			rgba.B |= 0x07
+		}
+		col = rgba
+		log.Printf("RGB565 color at %d,%d: %v", x, y, col)
 	default:
 		col = color.Transparent // Unsupported format
 	}
@@ -128,13 +141,14 @@ func (i *Image) Set(x, y int, c color.Color) {
 		rawData[offset+1] = colG8
 		rawData[offset+2] = colB8
 		rawData[offset+3] = 255
-	case PIXMAN_b5g6r5:
-		rawData[offset] = colB8&0xf8 | colG8>>5
-		rawData[offset+1] = colG8&0x1c<<3 | colR8>>3
-	case PIXMAN_r5g6b5:
-		rawData[offset] = colR8&0xf8 | (colG8>>5)&0x07
-		rawData[offset+1] = colG8&0x1c<<3 | colB8>>3
+	//case PIXMAN_b5g6r5:
+	//rawData[offset] = colB8&0xf8 | colG8>>5
+	//rawData[offset+1] = colG8&0x1c<<3 | colR8>>3
+	//case PIXMAN_r5g6b5:
+	//rawData[offset] = colR8&0xf8 | (colG8>>5)&0x07
+	//rawData[offset+1] = colG8&0x1c<<3 | colB8>>3
 	default:
+		log.Printf("Unsupported format for Set: %s", ImageGetFormat(i.pixman))
 		// Unsupported format, do nothing
 	}
 }

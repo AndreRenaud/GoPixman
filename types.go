@@ -58,6 +58,13 @@ type PixmanColor struct {
 	Alpha uint16
 }
 
+// Determines the depth in bits-per-pixel for a given Pixman format code.
+// See https://gitlab.freedesktop.org/pixman/pixman/-/blob/9879f6cfc40b4ef3bdca4ee9aaedacff8fb87244/pixman/pixman.h#L1010
+func (f PixmanFormatCode) BPP() int {
+	return int((uint32(f) >> 24) & 0xFF)
+
+}
+
 func (f PixmanFormatCode) String() string {
 	switch f {
 	case PIXMAN_a8r8g8b8:

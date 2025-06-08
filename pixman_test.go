@@ -10,16 +10,25 @@ import (
 	"testing"
 )
 
-func compareSubImage(img1, img2 image.Image, bounds image.Rectangle) error {
+func colorMatch(c1, c2 color.Color, delta uint32) bool {
+	r1, g1, b1, a1 := c1.RGBA()
+	r2, g2, b2, a2 := c2.RGBA()
+
+	rMatch := (r1>>8)+delta >= (r2>>8) && (r1>>8) <= (r2>>8)+delta
+	gMatch := (g1>>8)+delta >= (g2>>8) && (g1>>8) <= (g2>>8)+delta
+	bMatch := (b1>>8)+delta >= (b2>>8) && (b1>>8) <= (b2>>8)+delta
+	aMatch := (a1>>8)+delta >= (a2>>8) && (a1>>8) <= (a2>>8)+delta
+	return rMatch && gMatch && bMatch && aMatch
+}
+
+func compareSubImage(img1, img2 image.Image, bounds image.Rectangle, delta uint32) error {
 	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
 		for x := bounds.Min.X; x < bounds.Max.X; x++ {
 			c1 := img1.At(x, y)
 			c2 := img2.At(x, y)
 
-			r1, g1, b1, a1 := c1.RGBA()
-			r2, g2, b2, a2 := c2.RGBA()
-			if r1 != r2 || g1 != g2 || b1 != b2 || a1 != a2 {
-				return fmt.Errorf("Pixel at (%d,%d) differs: img1=%v, img2=%v", x, y, c1, c2)
+			if !colorMatch(c1, c2, delta) {
+				return fmt.Errorf("Pixel at (%d,%d) differs: img1=%#v, img2=%#v", x, y, c1, c2)
 			}
 		}
 	}
@@ -40,6 +49,18 @@ func loadFile(filename string) (image.Image, error) {
 		return nil, fmt.Errorf("failed to close file %s: %v", filename, err)
 	}
 	return img, nil
+}
+
+func savePng(img image.Image, filename string) {
+	file, err := os.Create(filename)
+	if err != nil {
+		panic(fmt.Sprintf("failed to create PNG file %s: %v", filename, err))
+	}
+	defer file.Close()
+
+	if err := png.Encode(file, img); err != nil {
+		panic(fmt.Sprintf("failed to encode PNG file %s: %v", filename, err))
+	}
 }
 
 func BenchmarkImageFill(b *testing.B) {
@@ -103,7 +124,7 @@ func TestImageFill(t *testing.T) {
 	pixmanImg.Fill(img.Bounds(), col)
 	uniform := &image.Uniform{C: col}
 
-	if err := compareSubImage(pixmanImg, uniform, img.Bounds()); err != nil {
+	if err := compareSubImage(pixmanImg, uniform, img.Bounds(), 0); err != nil {
 		t.Errorf("Image fill did not match expected color: %v", err)
 	}
 }
@@ -125,7 +146,32 @@ func TestImageBlit(t *testing.T) {
 	}
 	pixmanImg.Composite(srcImage, img.Bounds(), image.Point{X: 0, Y: 0})
 
-	if err := compareSubImage(pixmanImg, img, img.Bounds()); err != nil {
+	if err := compareSubImage(pixmanImg, img, img.Bounds(), 0); err != nil {
 		t.Errorf("Image blit did not match expected image: %v", err)
+	}
+}
+
+func TestRGB565(t *testing.T) {
+	bases := []string{"testdata/red", "testdata/blue", "testdata/green", "testdata/pg-coral"}
+	for _, base := range bases {
+		t.Logf("Testing RGB565 for base: %s", base)
+		img, err := loadFile(base + ".png")
+		if err != nil {
+			t.Fatalf("failed to load image: %v", err)
+		}
+		rawData, err := os.ReadFile(base + "-rgb565.raw")
+		if err != nil {
+			t.Fatalf("failed to read raw data file: %v", err)
+		}
+		bounds := img.Bounds()
+		rawImage, err := ImageFromBits(PIXMAN_r5g6b5, bounds.Dx(), bounds.Dy(), rawData, bounds.Dx()*2)
+		if err != nil {
+			t.Fatalf("failed to create Pixman image from raw data: %v", err)
+		}
+		savePng(rawImage, base+"-rgb565.png")
+
+		if err := compareSubImage(rawImage, img, rawImage.Bounds(), 0x7f); err != nil {
+			t.Errorf("RGB565 image did not match expected image: %v", err)
+		}
 	}
 }
